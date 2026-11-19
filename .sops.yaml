@@ -1,0 +1,6 @@
+# SOPS config for dsh-superagent deployment secrets.
+# Plaintext staging (deploy/secrets/secrets.env) is git-ignored and never matches;
+# only encrypted archives (*.enc.yaml) are committed.
+creation_rules:
+  - path_regex: secrets/.*\.enc\.yaml$
+    age: age14zqknx95vr9y99f95825pfeqy5wq9ggre2cen2neuxuj4e6seegqlh29na

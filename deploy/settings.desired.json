@@ -1,0 +1,20 @@
+{
+  "source:github": {
+    "enabled": true,
+    "config": {
+      "repository": "Samuka007/dsh-superagent-prototype",
+      "cli": "/home/superagent/.local/bin/gh-agent"
+    }
+  },
+  "policy": {
+    "sources": {
+      "github": {
+        "allowed": [{ "id": "Samuka007" }]
+      }
+    }
+  },
+  "executor": {
+    "directory": "/home/superagent/.dsh-state/work",
+    "prepare": "git -C /home/superagent/dsh-superagent fetch --no-tags \"https://github.com/$DSH_SUPERAGENT_GITHUB_REPOSITORY.git\" \"${DSH_SUPERAGENT_GITHUB_PR_HEAD:-HEAD}:refs/dsh-superagent/$DSH_SUPERAGENT_TICKET\" && git -C /home/superagent/dsh-superagent worktree add -b \"agent/$DSH_SUPERAGENT_NAME\" \"$DSH_SUPERAGENT_DIR\" \"refs/dsh-superagent/$DSH_SUPERAGENT_TICKET\""
+  }
+}

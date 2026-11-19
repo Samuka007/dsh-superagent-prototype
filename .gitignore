@@ -3,3 +3,6 @@ lib/
 .artifacts/
 .env
 coverage/
+secrets/*
+!secrets/README.md
+!secrets/*.enc.yaml
