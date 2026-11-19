@@ -5,4 +5,4 @@ lib/
 coverage/
 secrets/*
 !secrets/README.md
-!secrets/*.enc.yaml
+!secrets/*.enc.*
