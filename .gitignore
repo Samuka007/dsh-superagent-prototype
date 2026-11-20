@@ -5,4 +5,5 @@ lib/
 coverage/
 secrets/*
 !secrets/README.md
+!secrets/*.enc
 !secrets/*.enc.*
