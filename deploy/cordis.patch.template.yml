@@ -1,0 +1,33 @@
+# dsh-superagent profile patch — rendered from this template by deploy/render-patch.sh.
+# Secrets are ${PLACEHOLDER}s substituted from the sops-decrypted values archive
+# (secrets/deployment.enc.env). Rotation: update staging.env via the wizard, re-encrypt,
+# re-render, restart. No process-env injection is involved.
+- id: webserver
+  config:
+    host: 127.0.0.1
+    port: 3082
+- id: dsh-superagent
+  config:
+    stateDir: /home/superagent/.dsh-state
+# Feishu Source is optional; uncomment after the bot lark-cli is provisioned:
+# - id: dsh-superagent-feishu
+#   disabled: false
+- id: llm-pi-ai
+  config:
+    providers:
+      newapi:
+        displayName: NewAPI relay
+        apiKey: ${NEWAPI_KEY}
+        api: openai-completions
+        baseURL: https://newapi.samuka007.top/v1
+        models:
+          - id: glm-5.3-flash
+            name: GLM 5.3 Flash
+            contextWindow: 128000
+- id: agent-default-model
+  config:
+    provider: newapi
+    model: glm-5.3-flash
+- id: web-search-deepseek
+  config:
+    apiKey: ${DEEPSEEK_API_KEY}
