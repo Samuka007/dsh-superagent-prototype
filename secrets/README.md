@@ -37,7 +37,9 @@ entered through chat.
 
 1. clone + `pnpm build` the bundle, create the DSH profile and plugin (`docs/006-deployment.md`)
 2. `deploy/apply-secrets.sh` — credentials (above)
-3. `node deploy/apply-settings.mjs` (as the service user, on the container) — runtime
-   settings from `deploy/settings.desired.json` (Sources / Policy / Execution live in
-   the state SQLite; secrets do not cover them)
+3. settings (Sources / Policy / Execution) live in the state SQLite
+   (`~/.dsh-state/orchestrator.sqlite`) — restore your state backup, or enter them
+   once via the panel / management API (`docs/006-deployment.md` "Management API"
+   has the PUT example). They persist and survive restarts; they are deliberately
+   NOT in this repository.
 4. `scripts/dsh-superagent start`
