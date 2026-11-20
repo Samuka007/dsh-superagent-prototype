@@ -1,26 +1,43 @@
 # secrets/
 
-Deployment credentials for dsh-superagent. Two kinds of files live here:
+Deployment credentials for dsh-superagent: three sops-encrypted files, one per
+destination. Decrypt key lives on the parent host (`dragonos-lab:~/dsh-deploy/keys.txt`)
+and nowhere else.
 
-| File | Committed? | What it is |
+| File | Decrypts to | Consumer |
 | --- | --- | --- |
-| `deployment.enc.yaml` | yes | The single sops-managed file: patch structure + `gh_agent_pat` / `newapi_api_key` / `deepseek_api_key`, with secret values encrypted inline (`ENC[...]`); non-secret config stays readable. Decrypt key lives on the parent host (`dragonos-lab:~/dsh-deploy/keys.txt`) and nowhere else. |
-| `staging.env` | **never** (git-ignored) | Legacy plaintext staging from the first-run wizard; superseded by editing the sops file directly (`sops secrets/deployment.enc.yaml`). Delete freely. |
+| `cordis.patch.enc.yml` | `~/.dsh/profiles/superagent/cordis.patch.yml` | DSH profile patch (patch structure readable; `apiKey` values ENC inline) |
+| `dsh-env.enc` | `~/.dsh-env` (dotenv) | model key, sourced via `.bashrc` (`set -a`; pi-ai honors only `apiKeyEnv`) |
+| `gh.pat.enc` | raw token stream | `gh-agent` keyring (`gh auth login --with-token`) |
 
-Provisioning flow (one encrypted file, one script):
+## Apply
 
 ```
-secrets/deployment.enc.yaml   ← the ONLY secret artifact (sops yaml: secret values are
-                                ENC[...] inline; patch structure stays readable)
-deploy/apply-secrets.sh       ← decrypts and delivers: patch -> profile dir,
-                                newapi key -> ~/.dsh-env, PAT -> gh-agent keyring,
-                                then restarts the service
+./deploy/apply-secrets.sh superagent@10.0.100.3
 ```
 
-Rotate: edit the values with `sops secrets/deployment.enc.yaml` (decrypts in-editor,
-re-encrypts on save), commit, run `deploy/apply-secrets.sh superagent@10.0.100.3`.
-`deploy/wizard-secrets.sh` is the first-run bootstrap that seeds the file.
+Decrypts each file on the sops host and delivers to its destination, then restarts
+the service and reports `status` exit code. Runs on any machine that can ssh both
+the sops host and the target.
 
-Adapter caveat (empirically verified): `dsh-llm-pi-ai` providers honor only
-`apiKeyEnv` (so the newapi key is delivered as env); `web-search-deepseek` accepts a
-literal `apiKey`, which is why it can live inside the patch itself.
+## Rotate
+
+Edit values with `sops secrets/cordis.patch.enc.yml` (decrypts in-editor,
+re-encrypts on save) — or rebuild the plaintext source and re-encrypt:
+
+```sh
+printf 'NEWAPI_API_KEY=%s\n' "$NEWAPI" > dsh-env.plain
+sops --input-type dotenv --age <age-pub> -e dsh-env.plain > dsh-env.enc
+```
+
+then commit and apply. Values arrive from your own secret sources; nothing here is
+entered through chat.
+
+## Rebuild container (full re-provisioning)
+
+1. clone + `pnpm build` the bundle, create the DSH profile and plugin (`docs/006-deployment.md`)
+2. `deploy/apply-secrets.sh` — credentials (above)
+3. `node deploy/apply-settings.mjs` (as the service user, on the container) — runtime
+   settings from `deploy/settings.desired.json` (Sources / Policy / Execution live in
+   the state SQLite; secrets do not cover them)
+4. `scripts/dsh-superagent start`
