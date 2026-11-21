@@ -47,15 +47,23 @@ export const GithubAccountsSchema = z.object({
   cli: z.string().trim().default(''),
 })
 export const FeishuBotSchema = z.object({ cli: z.string().trim().default('') })
+/** The cnb.cool account the Source watches: the repository as `owner/name` and the CLI signed in to the agent's account. */
+export const CnbAccountsSchema = z.object({
+  repository: z.string().trim().regex(/^([A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+)?$/, 'owner/name').default(''),
+  cli: z.string().trim().default(''),
+})
 /** Source configuration keys that affect deployment setup and trigger a restart when changed. */
-export const SETUP_FIELDS: Readonly<Record<string, readonly string[]>> = { github: Object.keys(GithubAccountsSchema.shape), feishu: Object.keys(FeishuBotSchema.shape) }
+export const SETUP_FIELDS: Readonly<Record<string, readonly string[]>> = { github: Object.keys(GithubAccountsSchema.shape), feishu: Object.keys(FeishuBotSchema.shape), cnb: Object.keys(CnbAccountsSchema.shape) }
 
 export interface Deployment extends Machine {
   repository: string
   github: { cli: string; login: string; noreply: string }
   feishu?: FeishuBot
+  /** Optional cnb.cool account; present only when the cnb Source names a CLI, resolved best-effort like Feishu. */
+  cnb?: CnbAccount
 }
 export interface FeishuBot { cli: string; appId: string; brand: 'feishu' | 'lark'; botId: string; name: string }
+export interface CnbAccount { cli: string; repository: string; login: string }
 
 /** Resolve a command name or absolute path to an executable file, ignoring the worker shim directory. */
 export function executable(name: string, path: string, exclude?: string): string {
@@ -103,6 +111,36 @@ export async function resolveDeployment(machine: Machine, github: unknown, probe
   const repository = access.name
   if (access.push !== true) throw new SetupError('repositoryReadOnly', { account: agent.login, repository })
   return { ...machine, repository, github: { cli, login: agent.login, noreply: `${agent.id}+${agent.login}@users.noreply.github.com` } }
+}
+
+const CnbUser = z.object({ username: z.string().regex(/^[A-Za-z0-9_.-]+$/) })
+const CnbRepository = z.object({ path: z.string().regex(/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/) })
+/**
+ * Verify the cnb.cool CLI identity and, when a repository is configured, that it resolves on cnb; `cnb` has no writable
+ * git credential helper, so push access is not checked here and the Source still reads and comments best-effort.
+ * Returns `undefined` when no CLI is named, so dsh-superagent runs without the cnb Source like it does without Feishu.
+ */
+export async function resolveCnb(machine: Machine, cnb: unknown, probe: Probe, path = process.env.PATH ?? ''): Promise<CnbAccount | undefined> {
+  const accounts = CnbAccountsSchema.parse(cnb ?? {})
+  if (!accounts.cli) return undefined
+  const fail = (error: unknown): never => { throw error instanceof SetupError ? error : new SetupError('cnbCliFailed', { output: reason(error) }) }
+  let cli = ''
+  try { cli = executable(accounts.cli, path, workerBin(machine.stateDir)) } catch (error) { fail(new SetupError('cnbCliMissing', { output: reason(error) })) }
+  // `cnb users get-user-info -v` prints the JSON envelope on stdout; `-v` never prompts.
+  const text = await probe(['env', 'CNB_CLI_NO_UPDATE_NOTIFIER=1', cli, 'users', 'get-user-info', '-v'])
+    .catch((error: unknown) => fail(new SetupError('cnbCliSignedOut', { output: reason(error) })))
+  const agent = parsed(CnbUser, envelopeData(text))
+  if (!agent) throw new SetupError('cnbNoAccount')
+  const named = accounts.repository
+  const access = parsed(CnbRepository, envelopeData(await probe(['env', 'CNB_CLI_NO_UPDATE_NOTIFIER=1', cli, 'repositories', 'get-by-id', '--repo', named, '-v'])
+    .catch((error: unknown) => fail(new SetupError('cnbRepositoryUnreadable', { account: agent.username, repository: named, output: reason(error) })))))
+  if (!access) throw new SetupError('cnbRepositoryUnreported', { repository: named })
+  // Use the canonical repository path returned by cnb so renamed repositories match incoming events.
+  return { cli, repository: access.path, login: agent.username }
+}
+/** Parses cnb-cli's `-v` JSON envelope and returns its `data` payload as text; returns empty text for a non-JSON body. */
+function envelopeData(text: string): string {
+  try { return JSON.stringify((JSON.parse(text) as { data?: unknown }).data ?? '') } catch { return text }
 }
 
 const AuthStatus = z.object({ appId: z.string().regex(/^cli_[A-Za-z0-9]+$/), brand: z.enum(['feishu', 'lark']).default('feishu'), identities: z.object({ bot: z.object({ status: z.string() }) }) })

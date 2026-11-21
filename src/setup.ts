@@ -1,7 +1,7 @@
 /** Structured startup and configuration errors with the settings location where the operator can fix them. */
 import { fill } from './infra/text.ts'
 
-export type SetupPlace = 'deployment' | 'github' | 'feishu'
+export type SetupPlace = 'deployment' | 'github' | 'feishu' | 'cnb'
 export const SETUP_PROBLEMS = {
   foreignFile: ['deployment', '{file} was not written by dsh-superagent; move it, or choose another state directory.'],
   gitTooOld: ['deployment', 'git does not read the github.com credential configuration dsh-superagent writes; dsh-superagent needs git 2.32 or later.'],
@@ -14,6 +14,12 @@ export const SETUP_PROBLEMS = {
   repositoryUnreadable: ['github', '@{account} cannot read {repository}.'],
   repositoryUnreported: ['github', 'The agent GitHub CLI did not return {repository}.'],
   repositoryReadOnly: ['github', '@{account} cannot push to {repository}.'],
+  cnbCliFailed: ['cnb', 'The cnb CLI does not work.'],
+  cnbCliMissing: ['cnb', 'The cnb CLI of the cnb.cool Source was not found.'],
+  cnbCliSignedOut: ['cnb', 'The cnb CLI cannot read its account.'],
+  cnbNoAccount: ['cnb', 'The cnb CLI did not report a cnb.cool account.'],
+  cnbRepositoryUnreadable: ['cnb', '@{account} cannot read {repository}.'],
+  cnbRepositoryUnreported: ['cnb', 'The cnb CLI did not return {repository}.'],
   feishuCliFailed: ['feishu', 'The bot lark-cli does not work.'],
   feishuNoApp: ['feishu', 'auth status of the bot lark-cli did not report the app.'],
   feishuBotNotReady: ['feishu', 'The bot identity of app {app} is {status}; configure the app secret with lark-cli.'],
