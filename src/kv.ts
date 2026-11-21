@@ -6,6 +6,7 @@ import type { PromptVersion } from './app/prompts.ts'
 import type { SettingsVersion } from './app/store.ts'
 import type { SettingsSave } from './policy.ts'
 import type { Retry } from './sources/github.ts'
+import type { CnbRetry } from './sources/cnb.ts'
 
 /** Key of a KV record whose value has type `V`; a plain string represents an untyped key. */
 export type Key<V> = string & { readonly __value?: V }
@@ -48,6 +49,16 @@ export const KV = {
     stream: family<{ since: string; started: Record<string, string>; etag?: string }, [stream: string]>('github-stream:'),
     branchCi: record<{ branch?: string; failures?: string[]; revision: number }>('github-branch-ci'),
     ci: family<{ fingerprint: string; revision: number }, [number: number]>('github-ci:') },
+  /**
+   * cnb.cool Source: per-thread read cursor by Issue/PR number and pending retries; per-stream cursor (`since`) and start
+   * times by kind; default-branch CI state; and per-PR CI fingerprint and revision (`revision` counts reported CI changes
+   * so each produces a distinct Trigger ID). All cnb identifiers are strings.
+   */
+  cnb: { retries: record<Record<string, CnbRetry>>('cnb-retry'),
+    cursor: family<string, [number: string]>('cnb-cursor:'),
+    stream: family<{ since: string; started: Record<string, string> }, [stream: string]>('cnb-stream:'),
+    branchCi: record<{ branch?: string; failures?: string[]; revision: number }>('cnb-branch-ci'),
+    ci: family<{ fingerprint: string; revision: number }, [number: string]>('cnb-ci:') },
   /**
    * Feishu Source: known chats (`true` for direct messages); per-chat history cursor and active topics mapped from topic ID
    * to last-seen timestamp; and per-polled-thread seen message IDs and initialization flag.
